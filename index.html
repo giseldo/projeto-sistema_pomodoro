@@ -37,6 +37,9 @@
         </nav>
     </header>
 
+    <!-- Notification Area -->
+    <div id="notification" class="notification" style="display: none;"></div>
+
     <!-- Main Content -->
     <main class="container-flex">
         <div class="main-content">
@@ -83,9 +86,6 @@
                     <p id="cycle-counter" aria-label="Contador de ciclos">Ciclo: 1 / 4</p>
                     <p id="session-counter" aria-label="Contador de sessões">Sessão: 1 / 1</p>
                 </div>
-
-                <!-- Notification Area -->
-                <div id="notification" class="notification" style="display: none;"></div>
             </section>
 
             <!-- Tasks Section -->
@@ -106,90 +106,90 @@
         </button>
     </main>
 
-<!-- Settings Modal -->
-<div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="settingsModalLabel">Configurações</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <h6>TIMER (min)</h6>
-                <div class="row mb-3 timer-settings">
-                    <div class="col">
-                        <label for="pomodoro-time">Pomodoro</label>
-                        <input type="number" id="pomodoro-time" class="form-control" value="25" min="1" required />
-                    </div>
-                    <div class="col">
-                        <label for="short-break-time">Pausa Curta</label>
-                        <input type="number" id="short-break-time" class="form-control" value="5" min="1" required />
-                    </div>
-                    <div class="col">
-                        <label for="long-break-time">Pausa Longa</label>
-                        <input type="number" id="long-break-time" class="form-control" value="15" min="1" required />
-                    </div>
+    <!-- Settings Modal -->
+    <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="settingsModalLabel">Configurações</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="mb-3">
-                    <label for="cycles-per-session">Ciclos por Sessão</label>
-                    <div class="input-with-tooltip">
-                        <input type="number" id="cycles-per-session" class="form-control" value="4" min="1" required />
-                        <span class="tooltip-text">Número de Pomodoros antes de uma pausa longa e fim da sessão.</span>
+                <div class="modal-body">
+                    <h6>TIMER (min)</h6>
+                    <div class="row mb-3 timer-settings">
+                        <div class="col">
+                            <label for="pomodoro-time">Pomodoro</label>
+                            <input type="number" id="pomodoro-time" class="form-control" value="25" min="1" required />
+                        </div>
+                        <div class="col">
+                            <label for="short-break-time">Pausa Curta</label>
+                            <input type="number" id="short-break-time" class="form-control" value="5" min="1" required />
+                        </div>
+                        <div class="col">
+                            <label for="long-break-time">Pausa Longa</label>
+                            <input type="number" id="long-break-time" class="form-control" value="15" min="1" required />
+                        </div>
                     </div>
-                </div>
-                <div class="mb-3">
-                    <label for="session-count">Número de Sessões</label>
-                    <div class="input-with-tooltip">
-                        <input type="number" id="session-count" class="form-control" value="1" min="1" required />
-                        <span class="tooltip-text">Quantas sessões (cada uma com os ciclos definidos) devem ser repetidas.</span>
+                    <div class="mb-3">
+                        <label for="cycles-per-session">Ciclos por Sessão</label>
+                        <div class="input-with-tooltip">
+                            <input type="number" id="cycles-per-session" class="form-control" value="4" min="1" required />
+                            <span class="tooltip-text">Número de Pomodoros antes de uma pausa longa e fim da sessão.</span>
+                        </div>
                     </div>
-                </div>
+                    <div class="mb-3">
+                        <label for="session-count">Número de Sessões</label>
+                        <div class="input-with-tooltip">
+                            <input type="number" id="session-count" class="form-control" value="1" min="1" required />
+                            <span class="tooltip-text">Quantas sessões (cada uma com os ciclos definidos) devem ser repetidas.</span>
+                        </div>
+                    </div>
 
-                <hr class="section-divider" />
+                    <hr class="section-divider" />
 
-                <h6>TAREFAS</h6>
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="notify-on-task-complete" />
-                    <label class="form-check-label" for="notify-on-task-complete">Notificar ao Concluir Tarefa</label>
-                    <span class="tooltip-text">Ative para receber uma notificação quando uma tarefa for concluída.</span>
-                </div>
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="show-task-descriptions" checked />
-                    <label class="form-check-label" for="show-task-descriptions">Mostrar Descrição das Tarefas</label>
-                    <span class="tooltip-text">Ative para exibir as descrições das tarefas na lista.</span>
-                </div>
+                    <h6>TAREFAS</h6>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="notify-on-task-complete" />
+                        <label class="form-check-label" for="notify-on-task-complete">Notificar ao Concluir Tarefa</label>
+                        <span class="tooltip-text">Ative para receber uma notificação quando uma tarefa for concluída.</span>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="show-task-descriptions" checked />
+                        <label class="form-check-label" for="show-task-descriptions">Mostrar Descrição das Tarefas</label>
+                        <span class="tooltip-text">Ative para exibir as descrições das tarefas na lista.</span>
+                    </div>
 
-                <hr class="section-divider" />
+                    <hr class="section-divider" />
 
-                <h6>AUTOMAÇÕES</h6>
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="auto-transitions" />
-                    <label class="form-check-label" for="auto-transitions">Transições Automáticas</label>
-                    <span class="tooltip-text">Ative para iniciar automaticamente Pomodoros e pausas.</span>
+                    <h6>AUTOMAÇÕES</h6>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="auto-transitions" />
+                        <label class="form-check-label" for="auto-transitions">Transições Automáticas</label>
+                        <span class="tooltip-text">Ative para iniciar automaticamente Pomodoros e pausas.</span>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="repeat-sessions" />
+                        <label class="form-check-label" for="repeat-sessions">Repetir Sessões Automaticamente</label>
+                        <span class="tooltip-text">Ative para repetir as sessões automaticamente.</span>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="auto-check-tasks" />
+                        <label class="form-check-label" for="auto-check-tasks">Marcar Tarefas Automaticamente</label>
+                        <span class="tooltip-text">Ative para marcar tarefas como concluídas automaticamente ao atingir os ciclos necessários.</span>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="auto-switch-tasks" />
+                        <label class="form-check-label" for="auto-switch-tasks">Alternar Tarefas Automaticamente</label>
+                        <span class="tooltip-text">Ative para alternar para a próxima tarefa automaticamente ao concluir uma tarefa.</span>
+                    </div>
                 </div>
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="repeat-sessions" />
-                    <label class="form-check-label" for="repeat-sessions">Repetir Sessões Automaticamente</label>
-                    <span class="tooltip-text">Ative para repetir as sessões automaticamente.</span>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary modal-btn" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary modal-btn" id="save-settings">Salvar</button>
                 </div>
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="auto-check-tasks" />
-                    <label class="form-check-label" for="auto-check-tasks">Marcar Tarefas Automaticamente</label>
-                    <span class="tooltip-text">Ative para marcar tarefas como concluídas automaticamente ao atingir os ciclos necessários.</span>
-                </div>
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="auto-switch-tasks" />
-                    <label class="form-check-label" for="auto-switch-tasks">Alternar Tarefas Automaticamente</label>
-                    <span class="tooltip-text">Ative para alternar para a próxima tarefa automaticamente ao concluir uma tarefa.</span>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary modal-btn" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary modal-btn" id="save-settings">Salvar</button>
             </div>
         </div>
     </div>
-</div>
 
     <!-- Task Modal -->
     <div class="modal fade" id="taskModal" tabindex="-1" aria-labelledby="taskModalLabel" aria-hidden="true">
