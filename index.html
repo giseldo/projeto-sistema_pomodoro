@@ -1,203 +1,284 @@
 <!DOCTYPE html>
 <html lang="pt-br">
-
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="A Pomodoro timer to boost productivity" />
     <title>EstudoCentrado</title>
+    <link rel="icon" type="image/png" href="favicon.png" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet" />
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
-
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
 </head>
-
-<body>
-    <!-- Barra de navegação -->
-    <nav class="navbar navbar-expand-lg navbar-dark fixed-top" id="navbar">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="#">EstudoCentrado</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
-                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link" href="#" data-bs-toggle="modal"
-                            data-bs-target="#settingsModal">Configurações</a>
-                        <!-- Abre o modal -->
-                    </li>
-                </ul>
+<body class="light-theme">
+    <!-- Navbar -->
+    <header>
+        <nav class="navbar navbar-expand-lg navbar-dark fixed-top" id="navbar">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="#">EstudoCentrado</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+                    <ul class="navbar-nav">
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" id="theme-toggle" aria-label="Alternar tema claro/escuro">
+                                <i class="fas fa-moon"></i> Tema Escuro
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#settingsModal"
+                                aria-label="Abrir configurações">Configurações</a>
+                        </li>
+                    </ul>
+                </div>
             </div>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container-flex">
+        <div class="main-content">
+            <!-- Timer Section -->
+            <section class="timer" id="timer-box" aria-label="Cronômetro Pomodoro">
+                <!-- Mode Buttons -->
+                <div id="mode-buttons" role="group" aria-label="Seleção de modo">
+                    <button id="pomodoro" class="btn selected" onclick="changeMode('pomodoro')" aria-pressed="true">
+                        Pomodoro
+                    </button>
+                    <button id="short-break" class="btn" onclick="changeMode('short-break')" aria-pressed="false">
+                        Pausa Curta
+                    </button>
+                    <button id="long-break" class="btn" onclick="changeMode('long-break')" aria-pressed="false">
+                        Pausa Longa
+                    </button>
+                </div>
+
+                <!-- Timer Display with Progress Circle -->
+                <div class="timer-display">
+                    <svg id="progress-circle" width="300" height="300">
+                        <circle id="progress-background" cx="150" cy="150" r="140" stroke="#555" stroke-width="10" fill="none" />
+                        <circle id="progress" cx="150" cy="150" r="140" stroke="#fff" stroke-width="10" fill="none"
+                            stroke-dasharray="879.645943005142" stroke-dashoffset="879.645943005142" />
+                    </svg>
+                    <h2 id="time" aria-label="Tempo restante">25:00</h2>
+                </div>
+
+                <!-- Control Buttons -->
+                <button id="start" class="pomodoro" aria-label="Iniciar ou pausar cronômetro">
+                    <i id="start-icon" class="fas fa-play"></i> INICIAR
+                </button>
+                <div id="button-container">
+                    <button id="next" style="display: none;" aria-label="Avançar para próxima etapa">
+                        <i class="fas fa-forward-step"></i>
+                    </button>
+                    <button id="stop" style="display: none;" aria-label="Parar e resetar cronômetro">
+                        <i class="fas fa-stop"></i>
+                    </button>
+                </div>
+
+                <!-- Cycle and Session Counters -->
+                <div class="counter-container">
+                    <p id="cycle-counter" aria-label="Contador de ciclos">Ciclo: 1 / 4</p>
+                    <p id="session-counter" aria-label="Contador de sessões">Sessão: 1 / 1</p>
+                </div>
+
+                <!-- Notification Area -->
+                <div id="notification" class="notification" style="display: none;"></div>
+            </section>
+
+            <!-- Tasks Section -->
+            <section class="tasks" aria-label="Lista de tarefas">
+                <h2>Tarefas</h2>
+                <ul id="task-list"></ul>
+                <button id="add-task" data-bs-toggle="modal" data-bs-target="#taskModal"
+                    aria-label="Adicionar nova tarefa">
+                    + Adicionar Tarefa
+                </button>
+            </section>
         </div>
-    </nav>
 
-    <!-- Container principal do Pomodoro -->
-    <div class="container-flex d-flex justify-content-center align-items-center flex-column"
-        style="min-height: 100vh; padding-top: 80px">
-        <div class="timer text-white p-5 rounded" id="timer-box">
-            <!-- Controle de modos (Pomodoro, Pausa Curta, Pausa Longa) -->
-            <div class="btn-group mb-4" role="group" id="mode-buttons">
-                <button id="pomodoro" class="btn btn-outline-light" onclick="changeMode('pomodoro')">
-                    Pomodoro
-                </button>
-                <button id="short-break" class="btn btn-outline-light" onclick="changeMode('short-break')">
-                    Pausa Curta
-                </button>
-                <button id="long-break" class="btn btn-outline-light" onclick="changeMode('long-break')">
-                    Pausa Longa
-                </button>
+        <!-- History Button -->
+        <button id="history-button" data-bs-toggle="modal" data-bs-target="#historyModal"
+            aria-label="Abrir histórico de tarefas concluídas">
+            <i class="fas fa-history"></i> Histórico
+        </button>
+    </main>
+
+<!-- Settings Modal -->
+<div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="settingsModalLabel">Configurações</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <!-- Display do cronômetro -->
-            <h2 id="time" class="display-1">25:00</h2>
+            <div class="modal-body">
+                <h6>TIMER (min)</h6>
+                <div class="row mb-3 timer-settings">
+                    <div class="col">
+                        <label for="pomodoro-time">Pomodoro</label>
+                        <input type="number" id="pomodoro-time" class="form-control" value="25" min="1" required />
+                    </div>
+                    <div class="col">
+                        <label for="short-break-time">Pausa Curta</label>
+                        <input type="number" id="short-break-time" class="form-control" value="5" min="1" required />
+                    </div>
+                    <div class="col">
+                        <label for="long-break-time">Pausa Longa</label>
+                        <input type="number" id="long-break-time" class="form-control" value="15" min="1" required />
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="cycles-per-session">Ciclos por Sessão</label>
+                    <div class="input-with-tooltip">
+                        <input type="number" id="cycles-per-session" class="form-control" value="4" min="1" required />
+                        <span class="tooltip-text">Número de Pomodoros antes de uma pausa longa e fim da sessão.</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="session-count">Número de Sessões</label>
+                    <div class="input-with-tooltip">
+                        <input type="number" id="session-count" class="form-control" value="1" min="1" required />
+                        <span class="tooltip-text">Quantas sessões (cada uma com os ciclos definidos) devem ser repetidas.</span>
+                    </div>
+                </div>
 
-            <!-- Botão de iniciar -->
-            <button id="start" class="btn btn-dark btn-lg mt-3">
-                INICIAR
-            </button>
+                <hr class="section-divider" />
 
-            <!-- Contêiner para os botões "PRÓXIMO" e "PARAR" -->
-            <div id="button-container" class="mt-3 d-flex justify-content-between"
-                style="width: 100%; max-width: 200px;">
-                <button id="next" class="btn btn-dark btn-lg" style="display: none; flex-grow: 1; margin-right: 10px;">
-                    <i class="fas fa-forward-step"></i> <!-- Ícone de avanço -->
-                </button>
-                <button id="stop" class="btn btn-danger btn-lg" style="display: none; flex-grow: 1;">
-                    <i class="fas fa-stop"></i> <!-- Ícone de parar -->
-                </button>
+                <h6>TAREFAS</h6>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="notify-on-task-complete" />
+                    <label class="form-check-label" for="notify-on-task-complete">Notificar ao Concluir Tarefa</label>
+                    <span class="tooltip-text">Ative para receber uma notificação quando uma tarefa for concluída.</span>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="show-task-descriptions" checked />
+                    <label class="form-check-label" for="show-task-descriptions">Mostrar Descrição das Tarefas</label>
+                    <span class="tooltip-text">Ative para exibir as descrições das tarefas na lista.</span>
+                </div>
+
+                <hr class="section-divider" />
+
+                <h6>AUTOMAÇÕES</h6>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="auto-transitions" />
+                    <label class="form-check-label" for="auto-transitions">Transições Automáticas</label>
+                    <span class="tooltip-text">Ative para iniciar automaticamente Pomodoros e pausas.</span>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="repeat-sessions" />
+                    <label class="form-check-label" for="repeat-sessions">Repetir Sessões Automaticamente</label>
+                    <span class="tooltip-text">Ative para repetir as sessões automaticamente.</span>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="auto-check-tasks" />
+                    <label class="form-check-label" for="auto-check-tasks">Marcar Tarefas Automaticamente</label>
+                    <span class="tooltip-text">Ative para marcar tarefas como concluídas automaticamente ao atingir os ciclos necessários.</span>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="auto-switch-tasks" />
+                    <label class="form-check-label" for="auto-switch-tasks">Alternar Tarefas Automaticamente</label>
+                    <span class="tooltip-text">Ative para alternar para a próxima tarefa automaticamente ao concluir uma tarefa.</span>
+                </div>
             </div>
-
-
-            <!-- Contador de ciclos -->
-            <p id="cycle-counter" class="mt-2">Ciclo: 0 / 4</p>
-        </div>
-
-        <!-- Lista de Tarefas -->
-        <div class="tasks mt-5">
-            <h2>Tarefas</h2>
-            <ul id="task-list" class="list-group"></ul>
-            <button id="add-task" class="btn btn-outline-primary mt-3" data-bs-toggle="modal"
-                data-bs-target="#task-modal">
-                + Adicionar Tarefa
-            </button>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary modal-btn" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary modal-btn" id="save-settings">Salvar</button>
+            </div>
         </div>
     </div>
+</div>
 
-    <!-- Modal de Configurações -->
-    <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+    <!-- Task Modal -->
+    <div class="modal fade" id="taskModal" tabindex="-1" aria-labelledby="taskModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="settingsModalLabel">
-                        Configurações
-                    </h5>
+                    <h5 class="modal-title" id="taskModalLabel">Adicionar Tarefa</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <h6>TIMER</h6>
-                    <div class="row mb-3">
-                        <div class="col">
-                            <label for="pomodoro-time">Pomodoro</label>
-                            <input type="number" id="pomodoro-time" class="form-control" value="25" />
-                        </div>
-                        <div class="col">
-                            <label for="short-break-time">Pausa Curta</label>
-                            <input type="number" id="short-break-time" class="form-control" value="5" />
-                        </div>
-                        <div class="col">
-                            <label for="long-break-time">Pausa Longa</label>
-                            <input type="number" id="long-break-time" class="form-control" value="15" />
-                        </div>
-                    </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="auto-start-breaks" />
-                        <label class="form-check-label" for="auto-start-breaks">Auto Start Pausas</label>
-                    </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="auto-start-pomodoros" />
-                        <label class="form-check-label" for="auto-start-pomodoros">Auto Start Pomodoros</label>
+                    <input type="hidden" id="task-index" value="-1" />
+                    <div class="mb-3">
+                        <label for="task-name" class="form-label">Nome da Tarefa</label>
+                        <input type="text" class="form-control" id="task-name" placeholder="Digite o nome da tarefa" required />
                     </div>
                     <div class="mb-3">
-                        <label for="long-break-interval">Intervalo de Pausa Longa</label>
-                        <input type="number" id="long-break-interval" class="form-control" value="4" />
+                        <label for="task-description" class="form-label">Descrição da Tarefa</label>
+                        <textarea class="form-control" id="task-description" rows="3" placeholder="Digite a descrição da tarefa"></textarea>
                     </div>
-
-                    <h6>TASK</h6>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="auto-check-tasks" />
-                        <label class="form-check-label" for="auto-check-tasks">Auto Check Tarefas</label>
+                    <div class="mb-3">
+                        <label for="task-cycles" class="form-label">Ciclos Pomodoro Necessários</label>
+                        <input type="number" class="form-control" id="task-cycles" value="1" min="1" required />
                     </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="auto-switch-tasks" />
-                        <label class="form-check-label" for="auto-switch-tasks">Auto Switch Tarefas</label>
+                    <div class="mb-3">
+                        <label for="task-priority" class="form-label">Prioridade</label>
+                        <select class="form-control" id="task-priority">
+                            <option value="high">Alta</option>
+                            <option value="medium" selected>Média</option>
+                            <option value="low">Baixa</option>
+                        </select>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        Fechar
-                    </button>
-                    <button type="button" class="btn btn-primary" id="save-settings">
-                        Salvar
-                    </button>
+                    <button type="button" class="btn btn-secondary modal-btn" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary modal-btn" id="save-task">Adicionar</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Modal para Adicionar Tarefa -->
-    <!-- Modal de Configurações -->
-    <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
+    <!-- History Modal -->
+    <div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="settingsModalLabel">Configurações</h5>
+                    <h5 class="modal-title" id="historyModalLabel">Histórico de Tarefas Concluídas</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <!-- Configurações do Timer -->
-                    <h6>TIMER</h6>
-                    <div class="row mb-3">
-                        <div class="col">
-                            <label for="pomodoro-time">Pomodoro</label>
-                            <input type="number" id="pomodoro-time" class="form-control" value="25">
+                    <div id="stats-container" class="mb-3"></div>
+                    <div class="history-controls mb-3">
+                        <div class="row">
+                            <div class="col-md-6 mb-2">
+                                <label for="history-sort" class="form-label">Ordenar por:</label>
+                                <select id="history-sort" class="form-control">
+                                    <option value="date-desc">Data (Mais recente primeiro)</option>
+                                    <option value="date-asc">Data (Mais antiga primeiro)</option>
+                                    <option value="priority-desc">Prioridade (Alta primeiro)</option>
+                                    <option value="priority-asc">Prioridade (Baixa primeiro)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <label for="history-filter" class="form-label">Filtrar por prioridade:</label>
+                                <select id="history-filter" class="form-control">
+                                    <option value="all">Todos</option>
+                                    <option value="high">Alta</option>
+                                    <option value="medium">Média</option>
+                                    <option value="low">Baixa</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="col">
-                            <label for="short-break-time">Pausa Curta</label>
-                            <input type="number" id="short-break-time" class="form-control" value="5">
-                        </div>
-                        <div class="col">
-                            <label for="long-break-time">Pausa Longa</label>
-                            <input type="number" id="long-break-time" class="form-control" value="15">
-                        </div>
                     </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="auto-start-breaks">
-                        <label class="form-check-label" for="auto-start-breaks">Auto Start Pausas</label>
-                    </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="auto-start-pomodoros">
-                        <label class="form-check-label" for="auto-start-pomodoros">Auto Start Pomodoros</label>
-                    </div>
-                    <div class="mb-3">
-                        <label for="long-break-interval">Intervalo de Pausa Longa</label>
-                        <input type="number" id="long-break-interval" class="form-control" value="4">
-                    </div>
+                    <ul id="history-list"></ul>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                    <button type="button" class="btn btn-primary" id="save-settings">Salvar</button>
-                    <!-- Certifique-se de que este botão tenha o ID correto -->
+                    <button type="button" class="btn btn-danger modal-btn" onclick="resetHistory()">Resetar Histórico</button>
+                    <button type="button" class="btn btn-secondary modal-btn" data-bs-dismiss="modal">Fechar</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Elemento de áudio -->
-    <audio id="alarm-sound" src="alarm.mp3" preload="auto"></audio>
+    <!-- Audio Elements -->
+    <audio id="pomodoro-sound" src="pomodoro-end.mp3" preload="auto"></audio>
+    <audio id="short-break-sound" src="short-break-end.mp3" preload="auto"></audio>
+    <audio id="long-break-sound" src="long-break-end.mp3" preload="auto"></audio>
 
-    <!-- Bootstrap JS -->
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="app.js"></script>
 </body>
-
 </html>

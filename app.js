@@ -1,280 +1,862 @@
-// Variáveis globais para controle do cronômetro
-let pomodoroTime = 25;         // Tempo de Pomodoro em minutos
-let shortBreakTime = 5;        // Tempo de Pausa Curta em minutos
-let longBreakTime = 15;        // Tempo de Pausa Longa em minutos
-let autoStartBreaks = false;   // Se true, as pausas começam automaticamente
-let autoStartPomodoros = false; // Se true, o Pomodoro começa automaticamente após a pausa
-let longBreakInterval = 3;     // Quantidade de ciclos de Pomodoro antes da Pausa Longa
-let currentTime = pomodoroTime * 60;
-let isRunning = false;
-let timer;
-let currentMode = 'pomodoro';  // Controla o modo atual ('pomodoro', 'short-break', 'long-break')
-let completedCycles = 1;       // Número de ciclos completados, começando sempre em 1
-let totalCycles = longBreakInterval; // Total de ciclos antes da pausa longa
+// Constants
+const DEFAULT_SETTINGS = {
+    version: '1.0.1',
+    pomodoroTime: 25,
+    shortBreakTime: 5,
+    longBreakTime: 15,
+    cyclesPerSession: 4,
+    autoTransitions: false,
+    repeatSessions: false,
+    sessionCount: 1,
+    autoCheckTasks: false,
+    autoSwitchTasks: false,
+    notifyOnTaskComplete: false, // Nova configuração adicionada
+    showTaskDescriptions: true   // Nova configuração adicionada
+};
 
-// Função para salvar as configurações no LocalStorage
-function saveSettingsToLocalStorage() {
-    const settings = {
-        pomodoroTime,
-        shortBreakTime,
-        longBreakTime,
-        autoStartBreaks,
-        autoStartPomodoros,
-        longBreakInterval
-    };
-    localStorage.setItem('pomodoroSettings', JSON.stringify(settings)); // Salva como string JSON
+const MODE_CONFIGS = {
+    pomodoro: { bgColor: '#4CAF50', boxColor: '#388E3C', time: () => settings.pomodoroTime * 60, button: 'pomodoro' },
+    'short-break': { bgColor: '#FF9800', boxColor: '#F57C00', time: () => settings.shortBreakTime * 60, button: 'short-break' },
+    'long-break': { bgColor: '#4a90e2', boxColor: '#3a72b5', time: () => settings.longBreakTime * 60, button: 'long-break' }
+};
+
+const PRIORITY_ORDER = { high: 3, medium: 2, low: 1 };
+
+// Global State
+let settings = { ...DEFAULT_SETTINGS };
+let currentTime = settings.pomodoroTime * 60;
+let initialTime = currentTime;
+let isRunning = false;
+let timer = null;
+let currentMode = 'pomodoro';
+let completedCycles = 1;
+let currentSession = 1;
+let completedTaskCycles = 0;
+let tasks = [];
+let completedTasks = [];
+let activeTaskIndex = null;
+let draggedTaskIndex = null;
+let historySort = 'date-desc';
+let historyFilter = 'all';
+let currentTheme = 'light'; // Padrão: tema claro
+
+// DOM Elements
+const DOM = {
+    timeDisplay: document.getElementById('time'),
+    startButton: document.getElementById('start'),
+    nextButton: document.getElementById('next'),
+    stopButton: document.getElementById('stop'),
+    cycleCounter: document.getElementById('cycle-counter'),
+    sessionCounter: document.getElementById('session-counter'),
+    taskList: document.getElementById('task-list'),
+    historyList: document.getElementById('history-list'),
+    timerBox: document.getElementById('timer-box'),
+    pomodoroSound: document.getElementById('pomodoro-sound'),
+    shortBreakSound: document.getElementById('short-break-sound'),
+    longBreakSound: document.getElementById('long-break-sound'),
+    settingsModal: document.getElementById('settingsModal'),
+    taskModal: document.getElementById('taskModal'),
+    progressCircle: document.getElementById('progress'),
+    notification: document.getElementById('notification'),
+    historySortSelect: document.getElementById('history-sort'),
+    historyFilterSelect: document.getElementById('history-filter'),
+    themeToggle: document.getElementById('theme-toggle'),
+    statsContainer: document.getElementById('stats-container')
+};
+
+// Utility Functions
+function showNotification(message) {
+    DOM.notification.textContent = message;
+    DOM.notification.style.display = 'block';
+    DOM.notification.classList.add('show');
+    setTimeout(() => {
+        DOM.notification.classList.remove('show');
+        setTimeout(() => DOM.notification.style.display = 'none', 500);
+    }, 3000);
 }
 
-// Função para carregar as configurações do LocalStorage
-function loadSettingsFromLocalStorage() {
+function formatTime(seconds) {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
+}
+
+// Theme Management
+function loadTheme() {
+    const savedTheme = localStorage.getItem('pomodoroTheme');
+    if (savedTheme) {
+        currentTheme = savedTheme;
+    }
+    applyTheme();
+}
+
+function saveTheme() {
+    localStorage.setItem('pomodoroTheme', currentTheme);
+}
+
+function applyTheme() {
+    document.body.classList.remove('light-theme', 'dark-theme');
+    document.body.classList.add(`${currentTheme}-theme`);
+    DOM.themeToggle.innerHTML = currentTheme === 'light' ? '<i class="fas fa-moon"></i> Tema Escuro' : '<i class="fas fa-sun"></i> Tema Claro';
+}
+
+function toggleTheme() {
+    currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+    applyTheme();
+    saveTheme();
+}
+
+// Settings Management
+function loadSettings() {
     const savedSettings = localStorage.getItem('pomodoroSettings');
     if (savedSettings) {
-        const settings = JSON.parse(savedSettings);
-        pomodoroTime = settings.pomodoroTime;
-        shortBreakTime = settings.shortBreakTime;
-        longBreakTime = settings.longBreakTime;
-        autoStartBreaks = settings.autoStartBreaks;
-        autoStartPomodoros = settings.autoStartPomodoros;
-        longBreakInterval = settings.longBreakInterval;
-        totalCycles = longBreakInterval;  // Atualiza o total de ciclos
-
-        // Atualiza os inputs do modal de configurações com os valores carregados
-        document.getElementById('pomodoro-time').value = pomodoroTime;
-        document.getElementById('short-break-time').value = shortBreakTime;
-        document.getElementById('long-break-time').value = longBreakTime;
-        document.getElementById('auto-start-breaks').checked = autoStartBreaks;
-        document.getElementById('auto-start-pomodoros').checked = autoStartPomodoros;
-        document.getElementById('long-break-interval').value = longBreakInterval;
-
-        // Atualiza o cronômetro e o contador de ciclos
-        resetTimer();
-        updateCycleCounter();
+        const parsed = JSON.parse(savedSettings);
+        if (parsed.version === DEFAULT_SETTINGS.version) {
+            settings = { ...parsed };
+        } else {
+            settings = { ...DEFAULT_SETTINGS };
+            saveSettings();
+        }
     }
-}
-
-// Função para atualizar o cronômetro com base nas configurações salvas
-function updateTimerSettings() {
-    pomodoroTime = parseInt(document.getElementById('pomodoro-time').value, 10);
-    shortBreakTime = parseInt(document.getElementById('short-break-time').value, 10);
-    longBreakTime = parseInt(document.getElementById('long-break-time').value, 10);
-    autoStartBreaks = document.getElementById('auto-start-breaks').checked;
-    autoStartPomodoros = document.getElementById('auto-start-pomodoros').checked;
-    longBreakInterval = parseInt(document.getElementById('long-break-interval').value, 10);
-    totalCycles = longBreakInterval;  // Atualiza o total de ciclos quando as configurações são salvas
-
-    // Salva as configurações no LocalStorage
-    saveSettingsToLocalStorage();
-
-    // Atualiza o cronômetro com o valor atual do modo
+    updateSettingsUI();
     resetTimer();
-    updateCycleCounter(); // Atualiza o contador de ciclos após salvar as configurações
+    updateCounters();
+    updateTaskDescriptionsVisibility(); // Adicionado para carregar a configuração de visibilidade
 }
 
-// Função para salvar configurações
-document.getElementById('save-settings').addEventListener('click', function () {
+function saveSettings() {
+    localStorage.setItem('pomodoroSettings', JSON.stringify(settings));
+}
+
+function updateSettingsUI() {
+    document.getElementById('pomodoro-time').value = settings.pomodoroTime;
+    document.getElementById('short-break-time').value = settings.shortBreakTime;
+    document.getElementById('long-break-time').value = settings.longBreakTime;
+    document.getElementById('cycles-per-session').value = settings.cyclesPerSession;
+    document.getElementById('auto-transitions').checked = settings.autoTransitions;
+    document.getElementById('repeat-sessions').checked = settings.repeatSessions;
+    document.getElementById('session-count').value = settings.sessionCount;
+    document.getElementById('auto-check-tasks').checked = settings.autoCheckTasks;
+    document.getElementById('auto-switch-tasks').checked = settings.autoSwitchTasks;
+    document.getElementById('notify-on-task-complete').checked = settings.notifyOnTaskComplete; // Novo
+    document.getElementById('show-task-descriptions').checked = settings.showTaskDescriptions;   // Novo
+}
+
+function saveTimerSettings() {
+    const newSettings = {
+        pomodoroTime: parseInt(document.getElementById('pomodoro-time').value, 10) || 25,
+        shortBreakTime: parseInt(document.getElementById('short-break-time').value, 10) || 5,
+        longBreakTime: parseInt(document.getElementById('long-break-time').value, 10) || 15,
+        cyclesPerSession: parseInt(document.getElementById('cycles-per-session').value, 10) || 4,
+        autoTransitions: document.getElementById('auto-transitions').checked,
+        repeatSessions: document.getElementById('repeat-sessions').checked,
+        sessionCount: parseInt(document.getElementById('session-count').value, 10) || 1,
+        autoCheckTasks: document.getElementById('auto-check-tasks').checked,
+        autoSwitchTasks: document.getElementById('auto-switch-tasks').checked,
+        notifyOnTaskComplete: document.getElementById('notify-on-task-complete').checked, // Novo
+        showTaskDescriptions: document.getElementById('show-task-descriptions').checked, // Novo
+        version: DEFAULT_SETTINGS.version
+    };
+
+    newSettings.pomodoroTime = Math.max(1, newSettings.pomodoroTime);
+    newSettings.shortBreakTime = Math.max(1, newSettings.shortBreakTime);
+    newSettings.longBreakTime = Math.max(1, newSettings.longBreakTime);
+    newSettings.cyclesPerSession = Math.max(1, newSettings.cyclesPerSession);
+    newSettings.sessionCount = Math.max(1, newSettings.sessionCount);
+
+    settings = newSettings;
+    saveSettings();
+    resetTimer();
     resetCycles();
-    updateTimerSettings();
-    // Fechar modal após salvar
-    const modalElement = document.getElementById('settingsModal');
-    const modal = bootstrap.Modal.getInstance(modalElement); // Obtém a instância do modal
-    modal.hide(); // Fecha o modal após salvar as configurações
-});
+    currentSession = 1;
+    updateCounters();
+    updateTaskDescriptionsVisibility(); // Adicionado para aplicar a configuração
+    bootstrap.Modal.getInstance(DOM.settingsModal).hide();
+}
 
-// Função para resetar o cronômetro
+// Função para atualizar a visibilidade das descrições das tarefas
+function updateTaskDescriptionsVisibility() {
+    if (settings.showTaskDescriptions) {
+        document.body.classList.remove('hide-task-descriptions');
+    } else {
+        document.body.classList.add('hide-task-descriptions');
+    }
+    renderTasks();
+}
+
+// Task Persistence
+function saveTasks() {
+    localStorage.setItem('pomodoroTasks', JSON.stringify(tasks));
+}
+
+function loadTasks() {
+    const savedTasks = localStorage.getItem('pomodoroTasks');
+    if (savedTasks) {
+        tasks = JSON.parse(savedTasks).map(task => ({
+            name: task.name || 'Tarefa sem nome',
+            description: task.description || 'Sem descrição',
+            cycles: task.cycles || 1,
+            completed: task.completed || false,
+            priority: task.priority || 'medium'
+        }));
+        sortTasksByPriority();
+    }
+    renderTasks();
+}
+
+function saveCompletedTasks() {
+    localStorage.setItem('completedTasks', JSON.stringify(completedTasks));
+}
+
+function loadCompletedTasks() {
+    const savedCompletedTasks = localStorage.getItem('completedTasks');
+    if (savedCompletedTasks) {
+        completedTasks = JSON.parse(savedCompletedTasks).map(task => ({
+            name: task.name || 'Tarefa sem nome',
+            description: task.description || 'Sem descrição',
+            cycles: task.cycles || 1,
+            priority: task.priority || 'medium',
+            completedAt: task.completedAt || new Date().toISOString()
+        }));
+    }
+    renderHistory();
+    updateStats();
+}
+
+// Timer Logic
+function updateTimeDisplay() {
+    DOM.timeDisplay.textContent = formatTime(currentTime);
+    DOM.timeDisplay.setAttribute('aria-label', `Tempo restante: ${formatTime(currentTime)}`);
+
+    const progress = (initialTime - currentTime) / initialTime;
+    const circumference = 2 * Math.PI * 140;
+    const offset = circumference * (1 - progress);
+    DOM.progressCircle.setAttribute('stroke-dashoffset', offset);
+}
+
 function resetTimer() {
-    clearInterval(timer);  
+    if (timer) {
+        clearInterval(timer);
+        timer = null;
+    }
     isRunning = false;
-
-    switch (currentMode) {
-        case 'pomodoro':
-            currentTime = pomodoroTime * 60;
-            break;
-        case 'short-break':
-            currentTime = shortBreakTime * 60;
-            break;
-        case 'long-break':
-            currentTime = longBreakTime * 60;
-            break;
-    }
-    updateTime();
-    document.getElementById('start').textContent = 'INICIAR';
-    document.getElementById('next').style.display = 'none';  // Esconder o botão "PRÓXIMO"
+    DOM.startButton.className = 'pomodoro';
+    DOM.startButton.innerHTML = '<i id="start-icon" class="fas fa-play"></i> INICIAR';
+    DOM.nextButton.style.display = 'none';
+    DOM.stopButton.style.display = 'none';
+    currentTime = MODE_CONFIGS[currentMode].time();
+    initialTime = currentTime;
+    updateTimeDisplay();
+    updateTaskButtons();
+    renderTasks();
 }
 
-// Função para resetar os ciclos e colocar o modo no Pomodoro
 function resetCycles() {
-    completedCycles = 1; // Zera os ciclos completados
-    currentMode = 'pomodoro';  // Define o modo como Pomodoro
-    changeMode('pomodoro');    // Alterna visualmente para o modo Pomodoro
-    updateCycleCounter();      // Atualiza o contador de ciclos
+    completedCycles = 1;
+    completedTaskCycles = 0;
+    currentMode = 'pomodoro';
+    changeMode('pomodoro');
+    updateCounters();
 }
 
-// Função para mudar o modo (Pomodoro, Pausa Curta, Pausa Longa)
 function changeMode(mode) {
-    resetButtons();
     currentMode = mode;
-
-    switch (mode) {
-        case 'pomodoro':
-            setMode('#4CAF50', '#388E3C', pomodoroTime * 60);
-            document.getElementById('pomodoro').classList.add('selected');
-            break;
-        case 'short-break':
-            setMode('#FF9800', '#F57C00', shortBreakTime * 60);
-            document.getElementById('short-break').classList.add('selected');
-            break;
-        case 'long-break':
-            setMode('#4a90e2', '#3a72b5', longBreakTime * 60);
-            document.getElementById('long-break').classList.add('selected');
-            break;
-    }
-    
-}
-
-// Função para aplicar as cores e estilos ao modo atual
-function setMode(bgColor, boxColor, time) {
-    const timerBox = document.getElementById('timer-box');
-    timerBox.classList.add('transition'); // Adiciona transição
-
-    document.body.style.backgroundColor = bgColor;
-    timerBox.style.backgroundColor = boxColor;
-    currentTime = time;
-    updateTime();
-
-    setTimeout(() => {
-        timerBox.classList.remove('transition'); // Remove a transição após 1 segundo
-    }, 1000);
-}
-
-// Função para resetar os botões de modo
-function resetButtons() {
-    document.querySelectorAll('#mode-buttons .btn').forEach(button => {
-        button.classList.remove('selected');
+    const config = MODE_CONFIGS[mode];
+    document.querySelectorAll('#mode-buttons .btn').forEach(btn => {
+        btn.classList.remove('selected');
+        btn.setAttribute('aria-pressed', 'false');
     });
+    document.getElementById(config.button).classList.add('selected');
+    document.getElementById(config.button).setAttribute('aria-pressed', 'true');
+
+    DOM.timerBox.classList.add('transition');
+    document.body.style.backgroundColor = config.bgColor;
+    DOM.timerBox.style.backgroundColor = config.boxColor;
+    currentTime = config.time();
+    initialTime = currentTime;
+    updateTimeDisplay();
+
+    DOM.startButton.className = mode;
+    DOM.startButton.innerHTML = `<i id="start-icon" class="fas ${isRunning ? 'fa-pause' : 'fa-play'}"></i> ${isRunning ? 'PAUSAR' : 'INICIAR'}`;
+
+    setTimeout(() => DOM.timerBox.classList.remove('transition'), 1000);
+    DOM.progressCircle.classList.remove('pomodoro', 'short-break', 'long-break');
+    DOM.progressCircle.classList.add(mode);
+
+    if (mode !== 'pomodoro') {
+        showNotification(mode === 'short-break' ? 'Pomodoro concluído! Iniciando Pausa Curta.' : 'Sessão concluída! Iniciando Pausa Longa.');
+    }
 }
 
-// Função para atualizar o tempo no display
-function updateTime() {
-    const minutes = Math.floor(currentTime / 60);
-    const seconds = currentTime % 60;
-    document.getElementById('time').textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-}
-
-// Função para iniciar o cronômetro
 function startTimer() {
+    if (isRunning) return; // Evita múltiplos timers
     timer = setInterval(() => {
         currentTime--;
-        updateTime();
+        updateTimeDisplay();
         if (currentTime <= 0) {
             clearInterval(timer);
+            timer = null;
             isRunning = false;
-            handleCycleCompletion();  // Função para o fim de ciclo
+            completeCycle();
         }
     }, 1000);
     isRunning = true;
-    document.getElementById('start').textContent = 'PAUSAR';
-    document.getElementById('next').style.display = 'inline-block';  // Exibe o botão "PRÓXIMO"
-    document.getElementById('stop').style.display = 'inline-block';  // Exibe o botão "PARAR"
+    DOM.startButton.className = currentMode;
+    DOM.startButton.innerHTML = '<i id="start-icon" class="fas fa-pause"></i> PAUSAR';
+    DOM.nextButton.style.display = 'inline-block';
+    DOM.stopButton.style.display = 'inline-block';
+    updateTaskButtons();
+    renderTasks();
 }
 
-// Função para parar e resetar o Pomodoro ao estado inicial
-document.getElementById('stop').addEventListener('click', function () {
-    const confirmStop = confirm("Você realmente deseja parar o Pomodoro? Isso resetará o cronômetro.");
-    
-    if (confirmStop) {
-        clearInterval(timer);  // Para o cronômetro
-        resetCycles();         // Reseta os ciclos para o estado inicial
-        resetTimer();          // Reseta o cronômetro para o modo Pomodoro inicial
-        document.getElementById('next').style.display = 'none';  // Esconde o botão "PRÓXIMO"
-        document.getElementById('stop').style.display = 'none';  // Esconde o botão "PARAR"
-    }
-});
-
-// Função para iniciar e pausar o cronômetro
-document.getElementById('start').addEventListener('click', function () {
-    if (!isRunning) {  // Se o cronômetro não está rodando, inicia
-        startTimer();
-    } else {  // Se o cronômetro está rodando, pausa
+function pauseTimer() {
+    if (timer) {
         clearInterval(timer);
-        isRunning = false;
-        document.getElementById('start').textContent = 'INICIAR';
-        document.getElementById('next').style.display = 'none';  // Esconde o botão "PRÓXIMO"
-        document.getElementById('stop').style.display = 'none';  // Esconde o botão "PARAR"
+        timer = null;
     }
-});
+    isRunning = false;
+    DOM.startButton.className = currentMode;
+    DOM.startButton.innerHTML = '<i id="start-icon" class="fas fa-play"></i> INICIAR';
+    DOM.nextButton.style.display = 'none';
+    DOM.stopButton.style.display = 'none';
+    updateTaskButtons();
+    renderTasks();
+}
 
-// Função para pular para a próxima etapa (Pomodoro ou pausa)
-document.getElementById('next').addEventListener('click', function () {
-    clearInterval(timer);  // Limpa o intervalo atual
-    isRunning = false;     // Marca o cronômetro como não rodando
-    handleCycleCompletion();  // Passa para a próxima etapa
-    //document.getElementById('next').style.display = 'none';  // Esconde o botão "PRÓXIMO"
-});
+function stopTimer() {
+    if (confirm('Deseja parar o Pomodoro? Isso resetará o cronômetro.')) {
+        if (timer) {
+            clearInterval(timer);
+            timer = null;
+        }
+        isRunning = false; // Garante que o estado seja atualizado
+        activeTaskIndex = null;
+        completedTaskCycles = 0;
+        resetCycles();
+        currentSession = 1;
+        resetTimer();
+        updateCounters();
+        showNotification('Cronômetro resetado.');
+    }
+}
 
-function handleCycleCompletion() {
-    const alarmSound = document.getElementById('alarm-sound');
-    alarmSound.play();  // Reproduz o som ao final do ciclo
+function findNextUncompletedTask(startIndex) {
+    sortTasksByPriority();
+    for (let i = startIndex; i < tasks.length; i++) {
+        if (!tasks[i].completed) return i;
+    }
+    for (let i = 0; i < startIndex; i++) {
+        if (!tasks[i].completed) return i;
+    }
+    return null;
+}
+
+function completeCycle() {
+    // Tocar som correspondente ao modo que acabou de terminar
+    try {
+        if (currentMode === 'pomodoro') {
+            DOM.pomodoroSound.play().catch(err => console.error('Erro ao reproduzir som do Pomodoro:', err));
+        } else if (currentMode === 'short-break') {
+            DOM.shortBreakSound.play().catch(err => console.error('Erro ao reproduzir som da Pausa Curta:', err));
+        } else if (currentMode === 'long-break') {
+            DOM.longBreakSound.play().catch(err => console.error('Erro ao reproduzir som da Pausa Longa:', err));
+        }
+    } catch (err) {
+        console.error('Erro ao acessar áudio:', err);
+    }
 
     if (currentMode === 'pomodoro') {
-        if (completedCycles < totalCycles) {
-            if (autoStartBreaks) {
-                changeMode('short-break');
+        completedCycles++;
+        completedTaskCycles++;
+
+        if (activeTaskIndex !== null && tasks[activeTaskIndex]) {
+            const task = tasks[activeTaskIndex];
+            const taskCompleted = completedTaskCycles >= task.cycles;
+
+            if (settings.autoCheckTasks && taskCompleted) {
+                tasks[activeTaskIndex].completed = true;
+                addToHistory(tasks[activeTaskIndex]);
+            }
+
+            let nextMode;
+            if (completedCycles <= settings.cyclesPerSession) {
+                nextMode = 'short-break';
+            } else {
+                nextMode = 'long-break';
+                currentSession++;
+                completedCycles = 1;
+            }
+
+            if (taskCompleted && settings.autoSwitchTasks) {
+                const nextTaskIndex = findNextUncompletedTask(activeTaskIndex + 1);
+                activeTaskIndex = nextTaskIndex;
+                completedTaskCycles = 0;
+                if (activeTaskIndex !== null) {
+                    settings.cyclesPerSession = tasks[activeTaskIndex].cycles;
+                    updateCounters();
+                }
+            }
+
+            renderTasks();
+            renderHistory();
+            saveTasks();
+            saveCompletedTasks();
+
+            if (nextMode === 'long-break' && settings.repeatSessions && currentSession <= settings.sessionCount) {
+                if (settings.autoTransitions) {
+                    changeMode(nextMode);
+                    startTimer();
+                } else {
+                    changeMode(nextMode);
+                }
+            } else if (nextMode === 'long-break') {
+                changeMode(nextMode);
+                showNotification('Sessão concluída! Descanse durante a Pausa Longa.');
+            } else if (settings.autoTransitions) {
+                changeMode(nextMode);
                 startTimer();
             } else {
-                alert('Pomodoro completo! Inicie a pausa curta.');
-
+                changeMode(nextMode);
             }
         } else {
-            if (autoStartPomodoros) {
-                changeMode('long-break');
-                startTimer();
+            if (completedCycles < settings.cyclesPerSession) {
+                const nextMode = 'short-break';
+                if (settings.autoTransitions) {
+                    changeMode(nextMode);
+                    startTimer();
+                } else {
+                    changeMode(nextMode);
+                }
             } else {
-                alert('Ciclos completos! Inicie a pausa longa.');
-
+                const nextMode = 'long-break';
+                currentSession++;
+                completedCycles = 1;
+                activeTaskIndex = null;
+                completedTaskCycles = 0;
+                if (settings.repeatSessions && currentSession <= settings.sessionCount) {
+                    if (settings.autoTransitions) {
+                        changeMode(nextMode);
+                        startTimer();
+                    } else {
+                        changeMode(nextMode);
+                    }
+                } else {
+                    changeMode(nextMode);
+                    showNotification('Sessão concluída! Descanse durante a Pausa Longa.');
+                }
             }
         }
     } else if (currentMode === 'short-break') {
-        completedCycles++;
-        updateCycleCounter();
-        if (autoStartPomodoros) {
-            changeMode('pomodoro');
-            startTimer();
+        const nextMode = 'pomodoro';
+        if (settings.autoSwitchTasks && activeTaskIndex === null) {
+            activeTaskIndex = findNextUncompletedTask(0);
+            if (activeTaskIndex !== null) {
+                settings.cyclesPerSession = tasks[activeTaskIndex].cycles;
+                completedTaskCycles = 0;
+                updateCounters();
+            }
         }
-    } else if (currentMode === 'long-break') {
+        renderTasks();
+        saveTasks();
+        if (settings.autoTransitions) {
+            changeMode(nextMode);
+            startTimer();
+        } else {
+            changeMode(nextMode);
+            showNotification('Pausa Curta concluída! Inicie o próximo Pomodoro.');
+        }
+    } else {
+        completedTaskCycles = 0;
+        const nextMode = 'pomodoro';
+        if (settings.autoSwitchTasks) {
+            activeTaskIndex = findNextUncompletedTask(0);
+            if (activeTaskIndex !== null) {
+                settings.cyclesPerSession = tasks[activeTaskIndex].cycles;
+                updateCounters();
+            }
+        }
+        renderTasks();
+        saveTasks();
+        if (settings.repeatSessions && currentSession <= settings.sessionCount) {
+            completedCycles = 1;
+            if (settings.autoTransitions) {
+                changeMode(nextMode);
+                startTimer();
+            } else {
+                changeMode(nextMode);
+                showNotification('Pausa Longa concluída! Inicie a próxima sessão.');
+            }
+        } else {
+            isRunning = false;
+            DOM.startButton.className = 'pomodoro';
+            DOM.startButton.innerHTML = '<i id="start-icon" class="fas fa-play"></i> INICIAR';
+            DOM.nextButton.style.display = 'none';
+            DOM.stopButton.style.display = 'none';
+            currentTime = MODE_CONFIGS['pomodoro'].time();
+            initialTime = currentTime;
+            currentMode = 'pomodoro';
+            changeMode('pomodoro');
+            updateTimeDisplay();
+            showNotification('Todas as sessões concluídas! Configure uma nova sessão para continuar.');
+        }
+    }
+    updateCounters();
+}
+
+function updateCounters() {
+    DOM.cycleCounter.textContent = `Ciclo: ${completedCycles} / ${settings.cyclesPerSession}`;
+    DOM.sessionCounter.textContent = `Sessão: ${currentSession} / ${settings.sessionCount}`;
+}
+
+// Statistics
+function updateStats() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+
+    const todayTasks = completedTasks.filter(task => {
+        const completedAt = new Date(task.completedAt);
+        return completedAt >= today && completedAt < tomorrow;
+    });
+
+    const totalPomodoros = todayTasks.reduce((sum, task) => sum + task.cycles, 0);
+    const totalTasks = todayTasks.length;
+
+    const pomodorosByPriority = {
+        high: todayTasks.filter(task => task.priority === 'high').reduce((sum, task) => sum + task.cycles, 0),
+        medium: todayTasks.filter(task => task.priority === 'medium').reduce((sum, task) => sum + task.cycles, 0),
+        low: todayTasks.filter(task => task.priority === 'low').reduce((sum, task) => sum + task.cycles, 0)
+    };
+
+    DOM.statsContainer.innerHTML = `
+        <h6>Estatísticas de Hoje</h6>
+        <p>Total de Pomodoros Completados: ${totalPomodoros}</p>
+        <p>Total de Tarefas Concluídas: ${totalTasks}</p>
+        <p>Pomodoros por Prioridade:</p>
+        <ul>
+            <li>Alta: ${pomodorosByPriority.high}</li>
+            <li>Média: ${pomodorosByPriority.medium}</li>
+            <li>Baixa: ${pomodorosByPriority.low}</li>
+        </ul>
+    `;
+}
+
+// Task Management
+function sortTasksByPriority() {
+    tasks.sort((a, b) => PRIORITY_ORDER[b.priority] - PRIORITY_ORDER[a.priority]);
+}
+
+function resetTaskModal() {
+    document.getElementById('taskModalLabel').textContent = 'Adicionar Tarefa';
+    document.getElementById('save-task').textContent = 'Adicionar';
+    document.getElementById('task-index').value = '-1';
+    document.getElementById('task-name').value = '';
+    document.getElementById('task-description').value = '';
+    document.getElementById('task-cycles').value = '1';
+    document.getElementById('task-priority').value = 'medium';
+}
+
+function editTask(index) {
+    const task = tasks[index];
+    document.getElementById('taskModalLabel').textContent = 'Editar Tarefa';
+    document.getElementById('save-task').textContent = 'Salvar';
+    document.getElementById('task-index').value = index;
+    document.getElementById('task-name').value = task.name;
+    document.getElementById('task-description').value = task.description;
+    document.getElementById('task-cycles').value = task.cycles;
+    document.getElementById('task-priority').value = task.priority;
+    new bootstrap.Modal(DOM.taskModal).show();
+}
+
+function saveTask() {
+    const taskIndex = parseInt(document.getElementById('task-index').value, 10);
+    const taskName = document.getElementById('task-name').value.trim();
+    const taskDescription = document.getElementById('task-description').value.trim();
+    const taskCycles = parseInt(document.getElementById('task-cycles').value, 10) || 1;
+    const taskPriority = document.getElementById('task-priority').value;
+
+    if (!taskName) {
+        alert('Por favor, insira um nome para a tarefa.');
+        return;
+    }
+
+    const taskData = {
+        name: taskName,
+        description: taskDescription || 'Sem descrição',
+        cycles: Math.max(1, taskCycles),
+        priority: taskPriority,
+        completed: taskIndex >= 0 ? tasks[taskIndex].completed : false
+    };
+
+    if (taskIndex >= 0) {
+        tasks[taskIndex] = taskData;
+    } else {
+        tasks.push(taskData);
+    }
+
+    sortTasksByPriority();
+    renderTasks();
+    saveTasks();
+    resetTaskModal();
+    bootstrap.Modal.getInstance(DOM.taskModal).hide();
+}
+
+function deleteTask(index) {
+    if (activeTaskIndex === index) {
+        activeTaskIndex = null;
+        completedTaskCycles = 0;
+    } else if (activeTaskIndex > index) {
+        activeTaskIndex--;
+    }
+    tasks.splice(index, 1);
+    renderTasks();
+    saveTasks();
+}
+
+function addToHistory(task) {
+    const completedTask = {
+        name: task.name,
+        description: task.description,
+        cycles: task.cycles,
+        priority: task.priority,
+        completedAt: new Date().toISOString()
+    };
+    completedTasks.push(completedTask);
+    if (settings.notifyOnTaskComplete) { // Adicionado: notificação ao completar tarefa
+        showNotification(`Tarefa "${task.name}" concluída!`);
+    }
+    saveCompletedTasks();
+    renderHistory();
+    updateStats();
+}
+
+function toggleTaskCompletion(index) {
+    const task = tasks[index];
+    tasks[index].completed = !tasks[index].completed;
+    if (tasks[index].completed) {
+        addToHistory(task);
+    }
+    if (activeTaskIndex === index && tasks[index].completed) {
+        activeTaskIndex = null;
+        completedTaskCycles = 0;
+    }
+    sortTasksByPriority();
+    renderTasks();
+    renderHistory();
+    saveTasks();
+}
+
+function startTaskCycles(index) {
+    const task = tasks[index];
+
+    if (isRunning && activeTaskIndex !== null && activeTaskIndex !== index) {
+        if (!confirm('Outra tarefa está em execução. Deseja interromper a tarefa atual e iniciar esta?')) {
+            return;
+        }
+        pauseTimer();
         completedCycles = 1;
-        updateCycleCounter();
-        if (autoStartPomodoros) {
-            changeMode('pomodoro');
-            startTimer();
-        }
+        currentSession = 1;
+        completedTaskCycles = 0;
+    }
+
+    settings.cyclesPerSession = task.cycles;
+    activeTaskIndex = index;
+    completedTaskCycles = 0;
+    completedCycles = 1;
+    currentSession = 1;
+    updateCounters();
+    resetCycles();
+    startTimer();
+    showNotification(`Iniciando tarefa: ${task.name}`);
+}
+
+function resetHistory() {
+    if (confirm('Deseja resetar o histórico? Isso removerá todas as tarefas concluídas do histórico.')) {
+        completedTasks = [];
+        saveCompletedTasks();
+        renderHistory();
+        updateStats();
+        showNotification('Histórico resetado.');
     }
 }
 
-
-// Função para atualizar o contador de ciclos
-function updateCycleCounter() {
-    const cycleCounter = document.getElementById('cycle-counter');
-    cycleCounter.textContent = `Ciclo: ${completedCycles} / ${totalCycles}`;
+function updateTaskButtons() {
+    document.querySelectorAll('#task-list .start-task').forEach((button, idx) => {
+        button.classList.toggle('start-task-running', isRunning && idx === activeTaskIndex);
+    });
 }
 
-document.addEventListener('keydown', function(event) {
-    // Verifica se a tecla pressionada é a barra de espaço
-    if (event.code === 'Space') {
-        if (!isRunning) {  // Se o cronômetro não está rodando, inicia
-            startTimer();
-        } else {  // Se o cronômetro está rodando, pausa
-            clearInterval(timer);
-            isRunning = false;
-            document.getElementById('start').textContent = 'INICIAR';
-            document.getElementById('next').style.display = 'none';  // Esconde o botão "PRÓXIMO"
-            document.getElementById('stop').style.display = 'none';  // Esconde o botão "PARAR"
+function handleDragStart(e, index) {
+    draggedTaskIndex = index;
+    e.target.classList.add('dragging');
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.target.closest('li').classList.add('drag-over');
+}
+
+function handleDragLeave(e) {
+    e.target.closest('li').classList.remove('drag-over');
+}
+
+function handleDrop(e, dropIndex) {
+    e.preventDefault();
+    e.target.closest('li').classList.remove('drag-over');
+
+    if (draggedTaskIndex === null || draggedTaskIndex === dropIndex) return;
+
+    const [draggedTask] = tasks.splice(draggedTaskIndex, 1);
+    tasks.splice(dropIndex, 0, draggedTask);
+
+    if (activeTaskIndex !== null) {
+        if (activeTaskIndex === draggedTaskIndex) {
+            activeTaskIndex = dropIndex;
+        } else if (draggedTaskIndex < activeTaskIndex && dropIndex >= activeTaskIndex) {
+            activeTaskIndex--;
+        } else if (draggedTaskIndex > activeTaskIndex && dropIndex <= activeTaskIndex) {
+            activeTaskIndex++;
         }
+    }
+
+    draggedTaskIndex = null;
+    renderTasks();
+    saveTasks();
+}
+
+function handleDragEnd(e) {
+    e.target.classList.remove('dragging');
+    document.querySelectorAll('#task-list li').forEach(item => item.classList.remove('drag-over'));
+}
+
+function renderTasks() {
+    DOM.taskList.innerHTML = '';
+    tasks.forEach((task, index) => {
+        const li = document.createElement('li');
+        // Adicionado: classe de prioridade para a barra lateral colorida
+        li.className = `${task.completed ? 'completed' : ''} ${isRunning && index === activeTaskIndex ? 'task-active' : ''} priority-${task.priority}`;
+        li.setAttribute('draggable', 'true');
+        li.innerHTML = `
+            <div class="task-info">
+                <div class="task-details">
+                    <div class="task-name">${task.name} (${task.cycles} ciclos)</div>
+                    <div class="task-description">${task.description}</div>
+                </div>
+                <div class="task-actions">
+                    <button class="start-task ${isRunning && index === activeTaskIndex ? 'start-task-running' : ''}" onclick="startTaskCycles(${index})" aria-label="Iniciar Pomodoro para a tarefa">
+                        Iniciar
+                    </button>
+                    <button class="edit-task" onclick="editTask(${index})" aria-label="Editar tarefa">
+                        Editar
+                    </button>
+                    <button class="btn btn-sm btn-outline-success" onclick="toggleTaskCompletion(${index})" aria-label="${task.completed ? 'Desmarcar' : 'Marcar'} tarefa como concluída">
+                        <i class="fas ${task.completed ? 'fa-undo' : 'fa-check'}"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteTask(${index})" aria-label="Excluir tarefa">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        li.addEventListener('dragstart', (e) => handleDragStart(e, index));
+        li.addEventListener('dragover', handleDragOver);
+        li.addEventListener('dragleave', handleDragLeave);
+        li.addEventListener('drop', (e) => handleDrop(e, index));
+        li.addEventListener('dragend', handleDragEnd);
+        DOM.taskList.appendChild(li);
+    });
+}
+
+function renderHistory() {
+    // Filtrar tarefas com base no filtro de prioridade
+    let filteredTasks = completedTasks;
+    if (historyFilter !== 'all') {
+        filteredTasks = completedTasks.filter(task => task.priority === historyFilter);
+    }
+
+    // Ordenar tarefas com base na opção selecionada
+    let sortedTasks = [...filteredTasks];
+    if (historySort === 'date-desc') {
+        sortedTasks.sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
+    } else if (historySort === 'date-asc') {
+        sortedTasks.sort((a, b) => new Date(a.completedAt) - new Date(b.completedAt));
+    } else if (historySort === 'priority-desc') {
+        sortedTasks.sort((a, b) => PRIORITY_ORDER[b.priority] - PRIORITY_ORDER[a.priority]);
+    } else if (historySort === 'priority-asc') {
+        sortedTasks.sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]);
+    }
+
+    // Renderizar as tarefas filtradas e ordenadas
+    DOM.historyList.innerHTML = '';
+    sortedTasks.forEach(task => {
+        const li = document.createElement('li');
+        // Adicionado: classe de prioridade para a barra lateral no histórico
+        li.className = `priority-${task.priority}`;
+        const completedDate = new Date(task.completedAt);
+        const formattedDate = `${completedDate.toLocaleDateString('pt-BR')} ${completedDate.toLocaleTimeString('pt-BR')}`;
+        li.innerHTML = `
+            <div class="history-details">
+                <div class="history-name">${task.name} (${task.cycles} ciclos)</div>
+                <div class="history-description">${task.description}</div>
+                <div class="history-timestamp">Concluída em: ${formattedDate}</div>
+            </div>
+        `;
+        DOM.historyList.appendChild(li);
+    });
+}
+
+// Event Listeners
+DOM.startButton.addEventListener('click', () => {
+    if (isRunning) {
+        pauseTimer();
+    } else {
+        startTimer();
     }
 });
 
-// Inicializa as configurações e o modo Pomodoro quando a página carregar
-window.onload = function() {
-    loadSettingsFromLocalStorage();
+DOM.stopButton.addEventListener('click', stopTimer);
+
+DOM.nextButton.addEventListener('click', () => {
+    if (timer) {
+        clearInterval(timer);
+        timer = null;
+    }
+    isRunning = false;
+    completeCycle();
+});
+
+document.getElementById('save-settings').addEventListener('click', saveTimerSettings);
+document.getElementById('save-task').addEventListener('click', saveTask);
+
+DOM.taskModal.addEventListener('hidden.bs.modal', resetTaskModal);
+
+DOM.historySortSelect.addEventListener('change', () => {
+    historySort = DOM.historySortSelect.value;
+    renderHistory();
+});
+
+DOM.historyFilterSelect.addEventListener('change', () => {
+    historyFilter = DOM.historyFilterSelect.value;
+    renderHistory();
+});
+
+DOM.themeToggle.addEventListener('click', toggleTheme);
+
+document.addEventListener('keydown', (event) => {
+    if (event.code === 'Space' && !event.target.matches('input, textarea')) {
+        event.preventDefault();
+        DOM.startButton.click();
+    }
+});
+
+// Initialization
+window.onload = () => {
+    loadSettings();
+    loadTasks();
+    loadCompletedTasks();
+    loadTheme();
     changeMode('pomodoro');
-    updateCycleCounter();
+    updateCounters();
+    updateStats();
 };
